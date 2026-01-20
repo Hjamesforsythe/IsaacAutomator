@@ -1,13 +1,17 @@
 ![Isaac Automator](src/banner.png)
 
 # Isaac Automator (v3)
+# Hamilton Dev Version
 
 Isaac Automator allows quick deployment of Isaac Sim and Isaac Lab to public clouds (AWS, GCP, Azure, and Alibaba Cloud are currently supported).
 
-The result is a fully configured remote desktop cloud workstation that you can use to develop and test robotic applications within minutes and on a budget. Isaac Automator supports a variety of GPU instances and stop/start functionality to save on cloud costs and provides tools to aid your workflow (uploading and downloading data, autorun, deployment management, etc.).
+The result is a fully configured remote desktop cloud workstation that you can use to develop and test robotic applications within minutes and on a budget. Isaac Automator supports a variety of GPU instances and stop/start functionality to save on cloud costs and provides tools to aid your workflow (uploading and downloading data, autorun, deployment management, etc.).\
+
+For this version we reccomend using the AWS pipeline, all other deployment method documentation has been removed but can be found in the Isaac and IsaacAutomator documentation
 
 - [Installation](#installation)
   - [Installing Docker](#installing-docker)
+    - [Windows WSL Requirement](#windows-wsl-requirement)
   - [Obtaining NGC API Key](#obtaining-ngc-api-key)
   - [Building the Container](#building-the-container)
     - [Linux/macOS](#linuxmacos)
@@ -36,12 +40,43 @@ The result is a fully configured remote desktop cloud workstation that you can u
 - [Tips](#tips)
   - [Persisting Modifications to the Isaac Sim/Lab Environment](#persisting-modifications-to-the-isaac-simlab-environment)
   - [Updating Expired AWS Credentials](#updating-expired-aws-credentials)
+  - [Storing API Keys Securely](#storing-api-keys-securely)
 
 ## Installation
 
 ### Installing Docker
 
 Docker should be installed on your system. Visit <https://docs.docker.com/engine/install/> for installation instructions.
+
+#### Windows WSL Requirement
+
+On Windows, Docker Desktop requires **WSL 2 (Windows Subsystem for Linux)** to run Linux containers, which this project uses. To set up WSL:
+
+1. **Install WSL 2**: Open PowerShell as Administrator and run:
+   ```powershell
+   wsl --install
+   ```
+   This installs WSL 2 with the default Ubuntu distribution. Restart your computer when prompted.
+
+2. **Verify WSL 2 is installed**: After restarting, open a terminal and run:
+   ```powershell
+   wsl --version
+   ```
+
+3. **Configure Docker Desktop to use WSL 2**:
+   - Open Docker Desktop
+   - Go to **Settings** > **General**
+   - Ensure **"Use the WSL 2 based engine"** is checked
+   - Go to **Settings** > **Resources** > **WSL Integration**
+   - Enable integration with your installed Linux distribution(s)
+   - Click **Apply & Restart**
+
+4. **Verify Docker is working with WSL**: Open a terminal and run:
+   ```sh
+   docker run --rm hello-world
+   ```
+
+> **Note**: Without WSL 2 properly configured, you may encounter errors when building or running the Isaac Automator container, as it relies on Linux-based containers (`--platform linux/x86_64`).
 
 ### Obtaining NGC API Key
 
@@ -111,7 +146,7 @@ docker run --platform linux/x86_64 -it --rm -v .:/app isaac_automator bash
 ./somecommand
 ```
 
-### Deploying Instances
+### Deploying AWS Instances
 
 #### AWS
 
@@ -157,64 +192,6 @@ nano /app/state/<deployment_name>/.tfvars
 ```
 
 Then set the `aws_access_key_id`, `aws_secret_key`, and `aws_session_token` variables to the new values.
-
-#### GCP
-
-```sh
-# enter Isaac Automator container
-./run
-# inside container:
-./deploy-gcp
-```
-
-Tip: Run `./deploy-gcp --help` to see more options.
-
-#### Azure
-
-If you have a single subscription:
-
-```sh
-# enter Isaac Automator container
-./run
-# inside container:
-./deploy-azure
-```
-
-If you have multiple subscriptions:
-
-```sh
- # enter Isaac Automator container
-./run
-
-# inside container:
-az login # login
-az account show --output table # list subscriptions
-az account set --subscription "<subscription_name>"
-./deploy-azure --no-login
-```
-
-Tip: Run `./deploy-azure --help` to see more options.
-
-#### Alibaba Cloud
-
-<details>
-  <a name="#alicloud-access-creds"></a>
-  <summary>Getting Access Credentials</summary>
-  You will need an _Access Key_ and _Secret Key_ for an existing Alibaba Cloud account. You can obtain those in the [AccessKey Management](https://usercenter.console.aliyun.com/#/manage/ak) section of the Alibaba Cloud console.
-</details>
-
-Once you have prepared the access credentials, run the following command in the project root directory:
-
-```sh
-# enter Isaac Automator container
-./run
-# inside container:
-./deploy-alicloud
-```
-
-Tip: Run `./deploy-alicloud --help` to see more options.
-
-GPU-accelerated instances with NVIDIA A100, A10, and T4 GPUs are supported. You can find the complete list of instance types, availability, and pricing at <https://www.alibabacloud.com/help/en/ecs/user-guide/gpu-accelerated-compute-optimized-and-vgpu-accelerated-instance-families-1>. Please note that vGPU instances are not supported.
 
 ### Connecting to Deployed Instances
 
@@ -412,3 +389,42 @@ You can do this by running the following command:
 # inside container:
 nano /app/state/<deployment_name>/.tfvars
 ```
+
+### Storing API Keys Securely
+
+When working with AWS credentials and NGC API keys, follow these best practices to keep your keys secure:
+
+**General Guidelines:**
+- **Never commit keys to version control** - Add credential files to `.gitignore` and avoid hardcoding keys in scripts
+- **Use environment variables** - Store keys in environment variables rather than plaintext files when possible
+- **Limit key permissions** - Use IAM roles with minimum required permissions (e.g., only _AmazonEC2FullAccess_ for this project)
+- **Rotate keys regularly** - Periodically generate new keys and revoke old ones, especially if you suspect exposure
+
+**Platform-Specific Storage:**
+
+| Platform | Recommended Storage Location |
+|----------|------------------------------|
+| Windows  | Use Windows Credential Manager or store in `%USERPROFILE%\.aws\credentials` for AWS keys |
+| macOS    | Use Keychain Access or store in `~/.aws/credentials` for AWS keys |
+| Linux    | Use a secret manager (e.g., `pass`, `secret-tool`) or store in `~/.aws/credentials` with `chmod 600` permissions |
+
+**AWS Credentials File Example** (`~/.aws/credentials`):
+
+```ini
+[default]
+aws_access_key_id = YOUR_ACCESS_KEY
+aws_secret_access_key = YOUR_SECRET_KEY
+```
+
+**NGC API Key**: Store your NGC API key in an environment variable:
+
+```sh
+# Linux/macOS - add to ~/.bashrc or ~/.zshrc
+export NGC_API_KEY="your-ngc-api-key"
+
+# Windows - set via System Properties > Environment Variables
+# Or in PowerShell:
+[Environment]::SetEnvironmentVariable("NGC_API_KEY", "your-ngc-api-key", "User")
+```
+
+> **Future Development**: Planned security enhancements include integrated secrets management and support for cloud-native key vaults (AWS Secrets Manager, Azure Key Vault). Contributions welcome!
